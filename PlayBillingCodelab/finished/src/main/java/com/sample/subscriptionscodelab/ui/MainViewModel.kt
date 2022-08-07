@@ -18,6 +18,7 @@ package com.sample.subscriptionscodelab.ui
 
 import android.app.Activity
 import android.app.Application
+import android.util.Base64
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
@@ -31,6 +32,7 @@ import com.sample.subscriptionscodelab.repository.SubscriptionDataRepository
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import java.security.MessageDigest
 
 /**
  * The [AndroidViewModel] implementation combines all flows from the repo into a single one
@@ -141,8 +143,23 @@ class MainViewModel(application: Application) :
                 eligibleOffers.add(offerDetail)
             }
         }
-
+        var eligibleOffersString = ""
+        for (eligibleOffer in eligibleOffers) {
+            eligibleOffersString += " offer token: ${eligibleOffer.offerToken} tags: ${eligibleOffer.offerTags}"
+            for (phase in eligibleOffer.pricingPhases.pricingPhaseList) {
+                eligibleOffersString += "offer phase: $phase"
+            }
+        }
+        logLong("retrievedEligibleOffers: $eligibleOffersString")
         return eligibleOffers
+    }
+
+    fun logLong(str: String) {
+        val tag = "maddieTest"
+        if (str.length > 3800) {
+            Log.e(tag, str.substring(0, 3800))
+            logLong(str.substring(3800))
+        } else Log.e(tag, str)
     }
 
     /**
@@ -165,6 +182,8 @@ class MainViewModel(application: Application) :
         if (!offerDetails.isNullOrEmpty()) {
             for (offer in offerDetails) {
                 for (price in offer.pricingPhases.pricingPhaseList) {
+                    // TODO Question
+                    //  this simply returns the offer with a single pricing phase being the least priced...
                     if (price.priceAmountMicros < lowestPrice) {
                         lowestPrice = price.priceAmountMicros.toInt()
                         leastPricedOffer = offer
@@ -191,6 +210,7 @@ class MainViewModel(application: Application) :
         offerToken: String,
         oldToken: String
     ): BillingFlowParams {
+        logLong("before purchase, setting obfuscatedAccountId to ${offerToken.sha256()}")
         return BillingFlowParams.newBuilder().setProductDetailsParamsList(
             listOf(
                 BillingFlowParams.ProductDetailsParams.newBuilder()
@@ -205,8 +225,15 @@ class MainViewModel(application: Application) :
                     BillingFlowParams.ProrationMode.IMMEDIATE_AND_CHARGE_FULL_PRICE
                 )
                 .build()
+        ).setObfuscatedAccountId(offerToken.sha256()
         ).build()
     }
+
+    fun String.sha256() =
+        MessageDigest.getInstance("SHA-256")
+            .digest(this.toByteArray()).let {
+                String(Base64.encode(it, Base64.NO_WRAP))
+            }
 
     /**
      * BillingFlowParams Builder for normal purchases.
@@ -221,6 +248,7 @@ class MainViewModel(application: Application) :
         productDetails: ProductDetails,
         offerToken: String
     ): BillingFlowParams.Builder {
+        logLong("before purchase, setting obfuscatedAccountId to ${offerToken.sha256()}")
         return BillingFlowParams.newBuilder().setProductDetailsParamsList(
             listOf(
                 BillingFlowParams.ProductDetailsParams.newBuilder()
@@ -228,7 +256,7 @@ class MainViewModel(application: Application) :
                     .setOfferToken(offerToken)
                     .build()
             )
-        )
+        ).setObfuscatedAccountId(offerToken.sha256())
     }
 
     /**
@@ -258,10 +286,13 @@ class MainViewModel(application: Application) :
 
         // Get current purchase. In this app, a user can only have one current purchase at
         // any given time.
+        // TODO what the actual fuck?
         if (!currentPurchases.isNullOrEmpty() &&
             currentPurchases.size == MAX_CURRENT_PURCHASES_ALLOWED
         ) {
             // This either an upgrade, downgrade, or conversion purchase.
+            // TODO question
+            // how do they know this is an upgrade/downgrade or even active? could be any purchase
             val currentPurchase = currentPurchases.first()
 
             // Get the token from current purchase.
@@ -275,6 +306,10 @@ class MainViewModel(application: Application) :
                 )
             }
 
+            Log.e("maddietest",
+                "launchBillingFlow with productDetails " +
+                        "$productDetails and offerToken $offerToken"
+            )
             if (billingParams != null) {
                 billingClient.launchBillingFlow(
                     activity,
@@ -289,6 +324,10 @@ class MainViewModel(application: Application) :
                     offerToken = it
                 )
             }
+            Log.e("maddietest",
+                "launchBillingFlow with productDetails " +
+                        "$productDetails and offerToken $offerToken"
+            )
 
             if (billingParams != null) {
                 billingClient.launchBillingFlow(

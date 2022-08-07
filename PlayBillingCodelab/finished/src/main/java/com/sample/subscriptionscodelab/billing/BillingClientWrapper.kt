@@ -20,17 +20,7 @@ import android.app.Activity
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.MutableLiveData
-import com.android.billingclient.api.AcknowledgePurchaseParams
-import com.android.billingclient.api.BillingClient
-import com.android.billingclient.api.BillingClientStateListener
-import com.android.billingclient.api.BillingFlowParams
-import com.android.billingclient.api.BillingResult
-import com.android.billingclient.api.ProductDetails
-import com.android.billingclient.api.ProductDetailsResponseListener
-import com.android.billingclient.api.Purchase
-import com.android.billingclient.api.PurchasesUpdatedListener
-import com.android.billingclient.api.QueryProductDetailsParams
-import com.android.billingclient.api.QueryPurchasesParams
+import com.android.billingclient.api.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -73,6 +63,7 @@ class BillingClientWrapper(
                 if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                     Log.d(TAG, "Billing response OK")
                     // The BillingClient is ready. You can query purchases and product details here
+                    queryPurchaseHistoryAsync()
                     queryPurchases()
                     queryProductDetails()
                     billingConnectionState.postValue(true)
@@ -88,6 +79,21 @@ class BillingClientWrapper(
         })
     }
 
+    fun queryPurchaseHistoryAsync() {
+        if (!billingClient.isReady) {
+            Log.e(TAG, "queryPurchaseHistoryAsync: BillingClient is not ready")
+        }
+        // Query for existing subscription products that have been purchased.
+        billingClient.queryPurchaseHistoryAsync(
+            QueryPurchaseHistoryParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build()
+        ) { billingResult, purchaseHistoryRecordList ->
+            logLong(
+                "queryPurchaseHistoryAsync returned with result $billingResult and " +
+                        "purchaseHistoryRecordList $purchaseHistoryRecordList"
+            )
+        }
+    }
+
     // Query Google Play Billing for existing purchases.
     // New purchases will be provided to PurchasesUpdatedListener.onPurchasesUpdated().
     fun queryPurchases() {
@@ -98,11 +104,19 @@ class BillingClientWrapper(
         billingClient.queryPurchasesAsync(
             QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS).build()
         ) { billingResult, purchaseList ->
+            logLong("queryPurchasesAsync returned with result $billingResult and purchaseList $purchaseList")
             if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
                 if (!purchaseList.isNullOrEmpty()) {
                     _purchases.value = purchaseList
                 } else {
                     _purchases.value = emptyList()
+                }
+
+                purchaseList?.forEach { purchase ->
+                    logLong("queryPurchasesAsync $purchase and " +
+                            "obfuscatedAccountId ${purchase.accountIdentifiers?.obfuscatedAccountId} " +
+                            "and devPayload ${purchase.developerPayload} and originalJson " +
+                            "${purchase.originalJson}")
                 }
 
             } else {
@@ -116,18 +130,17 @@ class BillingClientWrapper(
         val params = QueryProductDetailsParams.newBuilder()
         val productList = mutableListOf<QueryProductDetailsParams.Product>()
         for (product in LIST_OF_PRODUCTS) {
-
             productList.add(
                 QueryProductDetailsParams.Product.newBuilder()
                     .setProductId(product)
                     .setProductType(BillingClient.ProductType.SUBS)
                     .build()
             )
-
-            params.setProductList(productList).let { productDetailsParams ->
-                Log.i(TAG, "queryProductDetailsAsync")
-                billingClient.queryProductDetailsAsync(productDetailsParams.build(), this)
-            }
+        }
+        logLong("calling queryProductDetailsAsync with productList $LIST_OF_PRODUCTS")
+        params.setProductList(productList).let { productDetailsParams ->
+            Log.i(TAG, "queryProductDetailsAsync")
+            billingClient.queryProductDetailsAsync(productDetailsParams.build(), this)
         }
     }
 
@@ -138,6 +151,20 @@ class BillingClientWrapper(
         billingResult: BillingResult,
         productDetailsList: MutableList<ProductDetails>
     ) {
+        var productDetailsString = ""
+        productDetailsList.forEach { productDetails ->
+            productDetailsString += " productDetails id: ${productDetails.productId} type: " +
+                    "${productDetails.productType} name: ${productDetails.name} description: " +
+                    "${productDetails.description} title: ${productDetails.title}"
+            productDetails.subscriptionOfferDetails?.forEach { offer ->
+                productDetailsString += " offer token: ${offer.offerToken} tags: ${offer.offerTags}"
+                for (phase in offer.pricingPhases.pricingPhaseList) {
+                    productDetailsString += "offer phase: $phase"
+                }
+            }
+        }
+
+        logLong("onProductDetailsResponse with productDetailsList $productDetailsList")
         val responseCode = billingResult.responseCode
         val debugMessage = billingResult.debugMessage
         when (responseCode) {
@@ -157,11 +184,20 @@ class BillingClientWrapper(
                     }
                 }
                 _productWithProductDetails.value = newMap
+//                logLong("onProductDetailsResponse with map $newMap")
             }
             else -> {
                 Log.i(TAG, "onProductDetailsResponse: $responseCode $debugMessage")
             }
         }
+    }
+
+    fun logLong(str: String) {
+        val tag = "maddieTest"
+        if (str.length > 3800) {
+            Log.e(tag, str.substring(0, 3800))
+            logLong(str.substring(3800))
+        } else Log.e(tag, str)
     }
 
     // Launch Purchase flow
@@ -170,7 +206,6 @@ class BillingClientWrapper(
             Log.e(TAG, "launchBillingFlow: BillingClient is not ready")
         }
         billingClient.launchBillingFlow(activity, params)
-
     }
 
     // PurchasesUpdatedListener that helps handle new purchases returned from the API
@@ -178,6 +213,7 @@ class BillingClientWrapper(
         billingResult: BillingResult,
         purchases: List<Purchase>?
     ) {
+        logLong("onPurchasesUpdated with result $billingResult and purchases $purchases")
         if (billingResult.responseCode == BillingClient.BillingResponseCode.OK
             && !purchases.isNullOrEmpty()
         ) {
@@ -187,6 +223,8 @@ class BillingClientWrapper(
             // Then, handle the purchases
             for (purchase in purchases) {
                 acknowledgePurchases(purchase)
+                logLong("onPurchasesUpdated for purchase $purchase with " +
+                        "obfuscatedAccountId ${purchase.accountIdentifiers?.obfuscatedAccountId}")
             }
         } else if (billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED) {
             // Handle an error caused by a user cancelling the purchase flow.
@@ -204,9 +242,11 @@ class BillingClientWrapper(
                     .setPurchaseToken(it.purchaseToken)
                     .build()
 
+                logLong("calling ackPurchase with params $params")
                 billingClient.acknowledgePurchase(
                     params
                 ) { billingResult ->
+                    logLong("ackPurchase returned with result $billingResult")
                     if (billingResult.responseCode == BillingClient.BillingResponseCode.OK &&
                         it.purchaseState == Purchase.PurchaseState.PURCHASED
                     ) {
