@@ -285,13 +285,11 @@ class MainViewModel(application: Application) :
 
         // Get current purchase. In this app, a user can only have one current purchase at
         // any given time.
-        // TODO what the actual fuck?
         if (!currentPurchases.isNullOrEmpty() &&
             currentPurchases.size == MAX_CURRENT_PURCHASES_ALLOWED
         ) {
             // This either an upgrade, downgrade, or conversion purchase.
-            // TODO question
-            // how do they know this is an upgrade/downgrade?
+            // TODO this is unrealistic logic... 
             val currentPurchase = currentPurchases.first()
 
             // Get the token from current purchase.
