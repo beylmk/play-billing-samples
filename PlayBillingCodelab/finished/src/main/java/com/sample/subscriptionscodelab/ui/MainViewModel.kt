@@ -225,7 +225,6 @@ class MainViewModel(application: Application) :
                     BillingFlowParams.ProrationMode.IMMEDIATE_AND_CHARGE_FULL_PRICE
                 )
                 .build()
-        ).setObfuscatedAccountId(offerToken.sha256()
         ).build()
     }
 
@@ -256,7 +255,7 @@ class MainViewModel(application: Application) :
                     .setOfferToken(offerToken)
                     .build()
             )
-        ).setObfuscatedAccountId(offerToken.sha256())
+        )
     }
 
     /**
@@ -292,7 +291,7 @@ class MainViewModel(application: Application) :
         ) {
             // This either an upgrade, downgrade, or conversion purchase.
             // TODO question
-            // how do they know this is an upgrade/downgrade or even active? could be any purchase
+            // how do they know this is an upgrade/downgrade?
             val currentPurchase = currentPurchases.first()
 
             // Get the token from current purchase.
