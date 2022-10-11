@@ -21,6 +21,7 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.MutableLiveData
 import com.android.billingclient.api.*
+import com.revenuecat.purchases.Purchases
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -213,6 +214,7 @@ class BillingClientWrapper(
         billingResult: BillingResult,
         purchases: List<Purchase>?
     ) {
+        Purchases.sharedInstance.syncPurchases()
         logLong("onPurchasesUpdated with result $billingResult and purchases $purchases")
         if (billingResult.responseCode == BillingClient.BillingResponseCode.OK
             && !purchases.isNullOrEmpty()

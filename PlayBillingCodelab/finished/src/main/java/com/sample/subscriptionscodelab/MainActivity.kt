@@ -25,6 +25,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.navigation.compose.rememberNavController
+import com.revenuecat.purchases.Purchases
+import com.revenuecat.purchases.PurchasesConfiguration
 import com.sample.subscriptionscodelab.Constants.MONTHLY_BASIC_PLANS_TAG
 import com.sample.subscriptionscodelab.Constants.MONTHLY_PREMIUM_PLANS_TAG
 import com.sample.subscriptionscodelab.Constants.PREPAID_BASIC_PLANS_TAG
@@ -44,6 +46,13 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        Purchases.debugLogsEnabled = true
+        Purchases.configure(
+            PurchasesConfiguration.Builder(
+                this,
+                "purchases_sample_api_key"
+            ).observerMode(true).build())
 
         setContent {
             BasicsCodelabTheme {
