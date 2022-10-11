@@ -40,6 +40,7 @@ import com.sample.subscriptionscodelab.ui.composable.LoadingScreen
 import com.sample.subscriptionscodelab.ui.composable.SubscriptionNavigationComponent
 import com.sample.subscriptionscodelab.ui.composable.UserProfile
 import com.sample.subscriptionscodelab.ui.theme.BasicsCodelabTheme
+import java.net.URL
 
 class MainActivity : ComponentActivity() {
     private val viewModel by viewModels<MainViewModel>()
@@ -48,6 +49,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         Purchases.debugLogsEnabled = true
+        Purchases.proxyURL = URL("khepri_local")
         Purchases.configure(
             PurchasesConfiguration.Builder(
                 this,
