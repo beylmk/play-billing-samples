@@ -95,7 +95,6 @@ dependencies {
     // Google PLay Billing library.
     def billing_version = "5.0.0"
     implementation "com.android.billingclient:billing-ktx:$billing_version"
-    implementation 'com.revenuecat.purchases:purchases:5.6.0'
 
     implementation('com.revenuecat.purchases:purchases') {
         version {
