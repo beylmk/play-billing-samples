@@ -7,3 +7,9 @@ dependencyResolutionManagement {
 }
 rootProject.name = "Play Billing Codelab"
 include ':start', ':finished'
+
+sourceControl {
+    gitRepository("https://github.com/revenuecat/purchases-android") {
+        producesModule("com.revenuecat.purchases:purchases")
+    }
+}
